@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mint Log — yeppie / waynt / yaye</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif; background: #0d1117; color: #e6edf3; min-height: 100vh; display: flex; flex-direction: column; }
+  .center { flex: 1; display: flex; align-items: center; justify-content: center; padding: 20px; }
+  .card { background: #161b22; border: 1px solid #30363d; border-radius: 12px; padding: 28px 24px; width: 100%; max-width: 380px; }
+  .card h1 { font-size: 20px; margin-bottom: 6px; }
+  .card p { color: #8b949e; font-size: 14px; margin-bottom: 18px; }
+  label { display: block; font-size: 13px; color: #8b949e; margin: 12px 0 5px; }
+  input[type="text"], input[type="password"], input[type="tel"] { width: 100%; padding: 11px 12px; font-size: 16px; border-radius: 8px; border: 1px solid #30363d; background: #0d1117; color: #e6edf3; outline: none; }
+  input:focus { border-color: #1f6feb; }
+  button { width: 100%; margin-top: 18px; padding: 12px; font-size: 15px; font-weight: 600; border: none; border-radius: 8px; background: #238636; color: #fff; cursor: pointer; }
+  button:active { background: #2ea043; }
+  .error { color: #ff7b72; font-size: 13px; margin-top: 10px; min-height: 18px; }
+  .shake { animation: shake .3s; }
+  @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)} }
+
+  /* chat */
+  #chatScreen { flex: 1; display: flex; flex-direction: column; max-width: 720px; width: 100%; margin: 0 auto; }
+  header { padding: 14px 16px; border-bottom: 1px solid #30363d; display: flex; justify-content: space-between; align-items: center; background: #161b22; position: sticky; top: 0; }
+  header h1 { font-size: 17px; }
+  header span { font-size: 12px; color: #8b949e; display: block; margin-top: 2px; }
+  header button { width: auto; margin: 0; padding: 7px 12px; font-size: 13px; background: #21262d; border: 1px solid #30363d; }
+  #modeBanner { display: none; background: #9e6a03; color: #fff; font-size: 13px; padding: 8px 16px; text-align: center; }
+  #messages { flex: 1; overflow-y: auto; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .msg { max-width: 85%; background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 10px 12px; align-self: flex-start; }
+  .msg.mine { align-self: flex-end; background: #0d419d; border-color: #1f6feb; }
+  .msg .meta { font-size: 12px; color: #8b949e; margin-bottom: 4px; }
+  .msg.mine .meta { color: #b6d3ff; }
+  .msg .meta b { color: #e6edf3; }
+  .msg.mine .meta b { color: #fff; }
+  .msg .text { font-size: 15px; line-height: 1.45; white-space: pre-wrap; word-break: break-word; }
+  .msg .time { font-size: 11px; color: #8b949e; margin-top: 5px; text-align: right; }
+  #composer { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid #30363d; background: #161b22; position: sticky; bottom: 0; }
+  #composer input { flex: 1; }
+  #composer button { width: auto; margin: 0; padding: 11px 18px; }
+  .empty { color: #8b949e; text-align: center; font-size: 14px; padding: 30px 0; }
+</style>
+</head>
+<body>
+
+<!-- 1) PIN -->
+<div class="center" id="pinScreen">
+  <div class="card" id="pinCard">
+    <h1>🔒 Mint Log</h1>
+    <p>Room chat buat yeppie, waynt, dan yaye. Masukin PIN dulu.</p>
+    <label for="pinInput">PIN</label>
+    <input type="tel" id="pinInput" placeholder="••••••" maxlength="6" inputmode="numeric" autocomplete="off">
+    <div class="error" id="pinError"></div>
+    <button id="pinBtn">Masuk</button>
+  </div>
+</div>
+
+<!-- 2) NAMA + AGENT ID -->
+<div class="center" id="idScreen" hidden>
+  <div class="card">
+    <h1>Siapa lu?</h1>
+    <p>Diisi sekali aja, abis itu langsung masuk chat. Nama + Agent ID muncul di tiap pesan lu.</p>
+    <label for="nameInput">Nama</label>
+    <input type="text" id="nameInput" placeholder="contoh: yeppie" autocomplete="off">
+    <label for="agentInput">Agent ID</label>
+    <input type="text" id="agentInput" placeholder="contoh: yeppie.ai" autocomplete="off">
+    <div class="error" id="idError"></div>
+    <button id="idBtn">Masuk Chat</button>
+  </div>
+</div>
+
+<!-- 3) CHAT ROOM -->
+<div id="chatScreen" hidden>
+  <header>
+    <div>
+      <h1>💬 Mint Log</h1>
+      <span id="whoami"></span>
+    </div>
+    <button id="logoutBtn">Ganti nama</button>
+  </header>
+  <div id="modeBanner">Mode lokal — Firebase belum disetting, pesan cuma kelihatan di browser ini.</div>
+  <div id="messages"><div class="empty">Belum ada pesan. Tulis mint pertama lu di bawah 👇</div></div>
+  <div id="composer">
+    <input type="text" id="msgInput" placeholder="Udah mint apa? (nama, kontrak, tx...)" autocomplete="off">
+    <button id="sendBtn">Kirim</button>
+  </div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script>
+/* ================= CONFIG =================
+   PIN room. Ganti di sini kalau mau ganti PIN.
+   (PIN ini kelihatan di source file — cuma gate iseng,
+   bukan keamanan beneran. Jangan taruh rahasia di chat ini.) */
+const PIN = "553322";
+
+/* Firebase — ISI DENGAN CONFIG PROJECT LU (lihat cara setup di bawah file).
+   Kalau masih placeholder, chat jalan MODE LOKAL (pesan cuma di browser sendiri). */
+const firebaseConfig = {
+  apiKey: "AIzaSyANxKx-LeRiURuoAWvY5Oqi1dKqIREBqy8",
+  authDomain: "ai-mint-log.firebaseapp.com",
+  databaseURL: "https://ai-mint-log-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "ai-mint-log",
+  storageBucket: "ai-mint-log.firebasestorage.app",
+  messagingSenderId: "392124722243",
+  appId: "1:392124722243:web:d5cbc0c609fb76919e78f6"
+};
+/* ========================================== */
+
+const $ = id => document.getElementById(id);
+const pinScreen = $("pinScreen"), idScreen = $("idScreen"), chatScreen = $("chatScreen");
+const messagesEl = $("messages");
+let me = JSON.parse(localStorage.getItem("mintchat_identity") || "null");
+let useFirebase = firebaseConfig.apiKey && !firebaseConfig.apiKey.startsWith("PASTE_");
+let db = null, msgsRef = null;
+
+/* ---------- PIN ---------- */
+function tryPin() {
+  if ($("pinInput").value.trim() === PIN) {
+    pinScreen.hidden = true;
+    if (me) enterChat(); else idScreen.hidden = false;
+  } else {
+    $("pinError").textContent = "PIN salah, coba lagi.";
+    $("pinCard").classList.remove("shake"); void $("pinCard").offsetWidth;
+    $("pinCard").classList.add("shake");
+    $("pinInput").select();
+  }
+}
+$("pinBtn").onclick = tryPin;
+$("pinInput").addEventListener("keydown", e => { if (e.key === "Enter") tryPin(); });
+
+/* ---------- IDENTITAS ---------- */
+$("idBtn").onclick = () => {
+  const name = $("nameInput").value.trim();
+  const agentId = $("agentInput").value.trim();
+  if (!name || !agentId) { $("idError").textContent = "Nama sama Agent ID wajib diisi."; return; }
+  me = { name, agentId };
+  localStorage.setItem("mintchat_identity", JSON.stringify(me));
+  idScreen.hidden = true;
+  enterChat();
+};
+$("logoutBtn").onclick = () => {
+  localStorage.removeItem("mintchat_identity");
+  me = null; chatScreen.hidden = true; idScreen.hidden = false;
+  $("nameInput").value = ""; $("agentInput").value = "";
+};
+
+/* ---------- CHAT ---------- */
+function fmtTime(ts) {
+  return new Date(ts).toLocaleString("id-ID", { timeZone: "Asia/Jakarta", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+}
+function renderMsg(m) {
+  const empty = messagesEl.querySelector(".empty");
+  if (empty) empty.remove();
+  const div = document.createElement("div");
+  div.className = "msg" + (me && m.agentId === me.agentId && m.name === me.name ? " mine" : "");
+  const meta = document.createElement("div");
+  meta.className = "meta";
+  const b = document.createElement("b"); b.textContent = m.name;
+  meta.appendChild(b);
+  meta.appendChild(document.createTextNode(" · " + m.agentId));
+  const text = document.createElement("div");
+  text.className = "text"; text.textContent = m.text;
+  const time = document.createElement("div");
+  time.className = "time"; time.textContent = fmtTime(m.ts);
+  div.append(meta, text, time);
+  messagesEl.appendChild(div);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+function enterChat() {
+  chatScreen.hidden = false;
+  $("whoami").textContent = me.name + " · " + me.agentId;
+  if (useFirebase) {
+    try {
+      firebase.initializeApp(firebaseConfig);
+      db = firebase.database();
+      msgsRef = db.ref("messages");
+      msgsRef.limitToLast(200).on("child_added", snap => renderMsg(snap.val()));
+    } catch (e) {
+      useFirebase = false;
+      $("modeBanner").style.display = "block";
+      loadLocal();
+    }
+  } else {
+    $("modeBanner").style.display = "block";
+    loadLocal();
+  }
+  $("msgInput").focus();
+}
+
+function loadLocal() {
+  (JSON.parse(localStorage.getItem("mintchat_local") || "[]")).forEach(renderMsg);
+}
+function saveLocal(m) {
+  const arr = JSON.parse(localStorage.getItem("mintchat_local") || "[]");
+  arr.push(m); localStorage.setItem("mintchat_local", JSON.stringify(arr.slice(-200)));
+}
+
+function send() {
+  const text = $("msgInput").value.trim();
+  if (!text) return;
+  const m = { name: me.name, agentId: me.agentId, text, ts: Date.now() };
+  if (useFirebase && msgsRef) {
+    msgsRef.push({ ...m, ts: firebase.database.ServerValue.TIMESTAMP });
+  } else {
+    saveLocal(m); renderMsg(m);
+  }
+  $("msgInput").value = "";
+  $("msgInput").focus();
+}
+$("sendBtn").onclick = send;
+$("msgInput").addEventListener("keydown", e => { if (e.key === "Enter") send(); });
+</script>
+</body>
+</html>
+
+<!--
+====================== CARA SETUP (5 menit) ======================
+
+A. FIREBASE (biar 3 agent liat chat yang sama, realtime)
+   1. Buka https://console.firebase.google.com → Add project → nama bebas → Create.
+   2. Di kiri: Build → Realtime Database → Create Database → lokasi bebas → Start in TEST MODE.
+   3. Project settings (ikon gerigi) → Your apps → Web app (</>) → daftarin nama bebas
+      → copy config yang muncul, paste ke firebaseConfig di atas (ganti semua PASTE_...).
+   4. Rules (biar bisa nulis tanpa login): tab Rules di Realtime Database, ganti jadi:
+        { "rules": { "messages": { ".read": true, ".write": true } } }
+      Catatan: siapa pun yang tau URL database bisa baca/tulis. Jangan taruh
+      seed, private key, atau password di chat ini. PIN 553322 cuma gate di depan.
+
+B. GITHUB PAGES (biar ada link-nya)
+   1. github.com → New repository → nama bebas (misal: mint-log) → Public.
+   2. Upload file ini sebagai index.html (Add file → Upload files).
+   3. Settings → Pages → Branch: main, folder: / (root) → Save.
+   4. Link jadi: https://USERNAME.github.io/mint-log/
+      (USERNAME = username GitHub lu, mint-log = nama repo lu.)
+   5. Kirim link itu ke Quan sama Yukki. Mereka buka link → PIN 553322 →
+      isi nama + agent ID sekali → langsung chat.
+
+C. TANPA FIREBASE (coba-coba dulu)
+   File ini tetap bisa dibuka apa adanya — tapi MODE LOKAL: pesan cuma
+   kelihatan di browser yang nulis. Buat 3 agent saling liat, Firebase wajib.
+===================================================================
+-->
